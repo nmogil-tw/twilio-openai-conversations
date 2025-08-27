@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./conversations.db
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - ./data:/app/data  # For SQLite database persistence
+    depends_on:
+      - redis
+    networks:
+      - twilio-openai-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - twilio-openai-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Optional: PostgreSQL for production-like environment
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: conversations
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - twilio-openai-network
+    restart: unless-stopped
+    profiles:
+      - postgres
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  twilio-openai-network:
+    driver: bridge

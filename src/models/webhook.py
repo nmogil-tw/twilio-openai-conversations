@@ -11,12 +11,12 @@ from enum import Enum
 
 class WebhookEventType(str, Enum):
     """Enumeration of supported Twilio webhook event types."""
-    ONMESSAGEADD = "onMessageAdd"
-    ONPARTICIPANTADD = "onParticipantAdd"
-    ONPARTICIPANTREMOVE = "onParticipantRemove"
+    ONMESSAGEADDED = "onMessageAdded"
+    ONPARTICIPANTADDED = "onParticipantAdded"
+    ONPARTICIPANTREMOVED = "onParticipantRemoved"
     ONCONVERSATIONSTATEUPDATE = "onConversationStateUpdate"
-    ONCONVERSATIONADD = "onConversationAdd"
-    ONCONVERSATIONREMOVE = "onConversationRemove"
+    ONCONVERSATIONADDED = "onConversationAdded"
+    ONCONVERSATIONREMOVED = "onConversationRemoved"
 
 
 class MediaType(str, Enum):
@@ -184,7 +184,7 @@ class WebhookRequest(BaseModel):
         Returns:
             True if this is a message event, False otherwise
         """
-        return self.EventType == WebhookEventType.ONMESSAGEADD
+        return self.EventType == WebhookEventType.ONMESSAGEADDED
     
     def is_participant_event(self) -> bool:
         """

@@ -89,7 +89,7 @@ class TwilioConversationService:
                 sid=twilio_message.sid,
                 account_sid=twilio_message.account_sid,
                 conversation_sid=twilio_message.conversation_sid,
-                service_sid=twilio_message.service_sid,
+                service_sid=self.service_sid,  # Use the service_sid from our client
                 participant_sid=twilio_message.participant_sid,
                 author=twilio_message.author,
                 body=twilio_message.body,
@@ -181,7 +181,7 @@ class TwilioConversationService:
             return TwilioConversation(
                 sid=conversation.sid,
                 account_sid=conversation.account_sid,
-                service_sid=conversation.service_sid,
+                service_sid=self.service_sid,  # Use the service_sid from our client
                 friendly_name=conversation.friendly_name,
                 unique_name=conversation.unique_name,
                 state=conversation.state,
@@ -227,7 +227,7 @@ class TwilioConversationService:
                     sid=participant.sid,
                     account_sid=participant.account_sid,
                     conversation_sid=participant.conversation_sid,
-                    service_sid=participant.service_sid,
+                    service_sid=self.service_sid,  # Use the service_sid from our client
                     identity=participant.identity,
                     messaging_binding=participant.messaging_binding,
                     role_sid=participant.role_sid,
@@ -399,7 +399,7 @@ class TwilioConversationService:
                 sid=participant.sid,
                 account_sid=participant.account_sid,
                 conversation_sid=participant.conversation_sid,
-                service_sid=participant.service_sid,
+                service_sid=self.service_sid,  # Use the service_sid from our client
                 identity=participant.identity,
                 messaging_binding=participant.messaging_binding,
                 role_sid=participant.role_sid,

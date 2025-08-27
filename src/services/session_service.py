@@ -160,7 +160,7 @@ class SessionService:
                         content=msg_record.content,
                         timestamp=msg_record.timestamp.replace(tzinfo=timezone.utc),
                         author=msg_record.author,
-                        metadata=msg_record.metadata or {}
+                        metadata=msg_record.message_metadata or {}
                     )
                     messages.append(message)
                 
@@ -279,7 +279,7 @@ class SessionService:
                 role=role,
                 content=content,
                 author=author,
-                metadata=metadata or {}
+                message_metadata=metadata or {}
             )
             
             session.add_message(message)

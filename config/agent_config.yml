@@ -1,7 +1,7 @@
 # Agent Configuration for Customer Service Assistant
 # This file defines the behavior, capabilities, and responses of the AI agent
 
-customer_service_agent:
+customer_service_agent: &customer_service_agent
   name: "Customer Service Assistant"
   model: "gpt-4o-mini"
   

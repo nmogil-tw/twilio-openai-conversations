@@ -194,7 +194,7 @@ class MessageDB(Base):
     role = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     author = Column(String(255), nullable=True)
-    metadata = Column(JSON, nullable=True)
+    message_metadata = Column(JSON, nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
 

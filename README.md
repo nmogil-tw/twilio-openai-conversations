@@ -1,5 +1,9 @@
 # Twilio Conversations + OpenAI Agents Integration
 
+## ⚠️ Important Notice
+
+**This is a reference application for educational and development purposes only. It is NOT intended for direct production use without proper security review, testing, and customization for your specific requirements.**
+
 ## 🏛️ Reference Architecture & Implementation
 
 **This is a complete reference architecture** demonstrating how to integrate [OpenAI Agents Python SDK](https://platform.openai.com/) with [Twilio's Conversations API](https://www.twilio.com/docs/conversations) to build intelligent customer service chatbots that operate across SMS, WhatsApp, and other messaging channels.

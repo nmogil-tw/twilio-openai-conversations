@@ -341,6 +341,37 @@ LOG_LEVEL=DEBUG         # Maximum logging detail
 - **Twilio Docs**: [Conversations API](https://www.twilio.com/docs/conversations)
 - **OpenAI Docs**: [OpenAI Platform](https://platform.openai.com/docs)
 
+## Deploy with Temporal
+
+For production deployments requiring durable execution and fault tolerance, you can deploy this application using [Temporal](https://temporal.io/blog/announcing-openai-agents-sdk-integration):
+
+### Benefits:
+- **Durable Execution**: Automatic retries on rate limits and network issues
+- **Fault Tolerance**: Agents recover from crashes and continue execution
+- **Scalability**: Each agent runs in its own process with dynamic capacity allocation
+- **Built-in Monitoring**: Integrates with OpenAI tracing and Temporal's observability
+
+### Quick Setup:
+```python
+# Install Temporal SDK
+pip install temporalio
+
+# Wrap your agents in a Temporal Workflow
+from temporalio import workflow
+from openai_agents import Runner
+
+@workflow.defn
+class ConversationWorkflow:
+    @workflow.run
+    async def run(self, message: str, conversation_sid: str) -> str:
+        # Your existing agent setup from src/services/agent_service.py
+        agent = Agent(name="Customer Service", instructions="...")
+        result = await Runner.run(agent, input=message)
+        return result.final_output
+```
+
+For complete setup instructions, see the [Temporal + OpenAI Agents integration guide](https://temporal.io/blog/announcing-openai-agents-sdk-integration).
+
 ---
 
 ## License

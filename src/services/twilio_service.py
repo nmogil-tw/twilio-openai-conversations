@@ -42,6 +42,48 @@ class TwilioConversationService:
             logger.error(f"Failed to initialize Twilio client: {e}")
             raise
     
+    async def ensure_agent_participant(
+        self,
+        conversation_sid: str,
+        agent_identity: str = "assistant"
+    ) -> bool:
+        """
+        Ensure the AI agent is added as a participant to the conversation.
+        
+        Args:
+            conversation_sid: Conversation SID
+            agent_identity: Identity of the AI agent
+            
+        Returns:
+            True if agent is participant, False otherwise
+        """
+        try:
+            participants = await self.get_conversation_participants(conversation_sid)
+            
+            # Check if agent is already a participant
+            agent_participant = next(
+                (p for p in participants if p.identity == agent_identity), 
+                None
+            )
+            
+            if not agent_participant:
+                logger.info(f"Adding AI agent '{agent_identity}' as participant to conversation {conversation_sid}")
+                
+                # Add agent as participant
+                participant = self.client.conversations.v1.services(self.service_sid) \
+                    .conversations(conversation_sid) \
+                    .participants.create(identity=agent_identity)
+                
+                logger.info(f"Agent participant added successfully: {participant.sid}")
+                return True
+            else:
+                logger.debug(f"Agent '{agent_identity}' already participant in conversation {conversation_sid}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error ensuring agent participant: {e}")
+            return False
+
     async def send_message(
         self,
         conversation_sid: str,
@@ -63,6 +105,11 @@ class TwilioConversationService:
         """
         try:
             logger.info(f"Sending message to conversation {conversation_sid}: {message[:100]}...")
+            
+            # Ensure AI agent is a participant before sending
+            if not await self.ensure_agent_participant(conversation_sid, author):
+                logger.error(f"Failed to ensure agent participant for conversation {conversation_sid}")
+                return None
             
             # Prepare message parameters
             message_params = {
@@ -284,15 +331,24 @@ class TwilioConversationService:
                 }
             
             # Check participant count and types
-            customer_participants = [
-                p for p in participants 
-                if p.identity and not p.identity.startswith("agent_")
-            ]
+            # SMS participants may not have identity, treat them as customers unless they're agents
+            customer_participants = []
+            agent_participants = []
             
-            agent_participants = [
-                p for p in participants 
-                if p.identity and p.identity.startswith("agent_")
-            ]
+            for p in participants:
+                if p.identity:
+                    # Participant has explicit identity
+                    if p.identity.startswith("agent_"):
+                        agent_participants.append(p)
+                    elif p.identity.startswith("human_agent_"):
+                        agent_participants.append(p)
+                    elif p.identity == "assistant":
+                        agent_participants.append(p)
+                    else:
+                        customer_participants.append(p)
+                else:
+                    # No identity - likely SMS participant, treat as customer
+                    customer_participants.append(p)
             
             has_human_agent = any(
                 p.identity and p.identity.startswith("human_agent_") 
@@ -308,6 +364,13 @@ class TwilioConversationService:
                     "customer_count": len(customer_participants),
                     "has_human_agent": True
                 }
+            
+            # Debug logging for participant analysis
+            logger.info(f"Conversation {conversation_sid} participants analysis: "
+                       f"total={len(participants)}, "
+                       f"customers={[p.identity for p in customer_participants]}, "
+                       f"agents={[p.identity for p in agent_participants]}, "
+                       f"human_agent={has_human_agent}")
             
             # Engage if there's exactly one customer and no human agents
             eligible = len(customer_participants) == 1 and not has_human_agent

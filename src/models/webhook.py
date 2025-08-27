@@ -157,7 +157,8 @@ class WebhookRequest(BaseModel):
     # Common fields for all webhook types
     EventType: WebhookEventType = Field(..., description="Type of webhook event")
     AccountSid: str = Field(..., description="Twilio Account SID")
-    ServiceSid: str = Field(..., description="Conversations Service SID")
+    ServiceSid: Optional[str] = Field(None, description="Conversations Service SID")
+    MessagingServiceSid: Optional[str] = Field(None, description="Messaging Service SID (SMS channels)")
     ConversationSid: str = Field(..., description="Conversation SID")
     
     # Message-specific fields (for onMessageAdd events)
@@ -213,6 +214,15 @@ class WebhookRequest(BaseModel):
             self.Body.strip() != "" and
             self.Author != "assistant"  # Don't respond to our own messages
         )
+    
+    def get_service_sid(self) -> Optional[str]:
+        """
+        Get the correct service SID regardless of webhook source.
+        
+        Returns:
+            Service SID from either ServiceSid or MessagingServiceSid field
+        """
+        return self.ServiceSid or self.MessagingServiceSid
     
     class Config:
         # Allow field names to match Twilio's PascalCase convention

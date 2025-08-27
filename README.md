@@ -3,7 +3,7 @@
 > **⚠️ REFERENCE ARCHITECTURE ONLY**  
 > This is a reference implementation demonstrating how to integrate Twilio Conversations with AI agents using OpenAI's Agents SDK. **This code is not production-ready** and is intended for educational and prototyping purposes. See the [Production Security Checklist](#production-security-checklist) for requirements before deploying to production.
 
-Build AI-powered customer service chatbots that work across SMS, WhatsApp, and messaging channels using Twilio Conversations API and OpenAI.
+Build AI-powered customer chatbots that work across SMS, WhatsApp, and messaging channels using Twilio Conversations API and OpenAI.
 
 ## What You Get
 

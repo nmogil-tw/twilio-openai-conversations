@@ -15,6 +15,9 @@ Before you begin, ensure you have the following:
 ### Development Tools
 - **Git**: For cloning the repository
 - **ngrok** (for local testing): [Download ngrok](https://ngrok.com/)
+- **Twilio CLI** (recommended): [Install guide](https://www.twilio.com/docs/twilio-cli/quickstart)
+- **Node.js** (for Twilio CLI): [Download Node.js](https://nodejs.org/)
+- **jq** (for JSON parsing): `brew install jq` or [download jq](https://stedolan.github.io/jq/)
 - **Code editor**: VS Code, PyCharm, or your preferred editor
 
 ## Quick Start
@@ -117,7 +120,166 @@ You should see the health check return a successful status.
 
 ### Twilio Setup
 
-#### 1. Create a Conversations Service
+#### Option A: Using Twilio CLI (Recommended for Automation)
+
+##### 1. Install and Configure Twilio CLI
+
+```bash
+# Install Twilio CLI
+npm install -g twilio-cli
+
+# Login to Twilio (opens browser for authentication)
+twilio login
+
+# Verify your account details
+twilio profiles:list
+```
+
+##### 2. Set Up Local Development Environment
+
+```bash
+# Start ngrok first to get your webhook URL
+ngrok http 8000
+
+# In another terminal, save the ngrok URL
+NGROK_URL="https://your-ngrok-url.ngrok.io"  # Replace with actual URL from ngrok
+```
+
+##### 3. Create and Configure Conversations Service
+
+```bash
+# Create Conversations service
+CONVERSATIONS_SERVICE_SID=$(twilio api:conversations:v1:services:create \
+  --friendly-name "AI Customer Service" \
+  --query "sid" \
+  --output json | jq -r .)
+
+echo "Created Conversations Service: $CONVERSATIONS_SERVICE_SID"
+
+# Configure webhooks for the service
+twilio api:conversations:v1:services:configuration:webhooks:update \
+  --path-sid $CONVERSATIONS_SERVICE_SID \
+  --pre-webhook-url "${NGROK_URL}/webhook/message-added" \
+  --post-webhook-url "${NGROK_URL}/webhook/participant-added" \
+  --method POST \
+  --filters "onMessageAdded" \
+  --filters "onParticipantAdded" \
+  --filters "onConversationStateUpdated"
+
+echo "Configured webhooks for service"
+```
+
+##### 4. SMS Setup - Purchase Phone Number and Configure
+
+```bash
+# Search for available phone numbers
+twilio phone-numbers:list:local --country-code US --sms-enabled --limit 5
+
+# Purchase a phone number (replace with desired area code)
+PHONE_NUMBER_SID=$(twilio phone-numbers:buy:local \
+  --country-code US \
+  --area-code 415 \
+  --sms-enabled \
+  --voice-enabled \
+  --query "sid" \
+  --output json | jq -r .)
+
+# Get the actual phone number
+PHONE_NUMBER=$(twilio phone-numbers:fetch $PHONE_NUMBER_SID \
+  --query "phoneNumber" \
+  --output json | jq -r .)
+
+echo "Purchased phone number: $PHONE_NUMBER (SID: $PHONE_NUMBER_SID)"
+
+# Create messaging service
+MESSAGING_SERVICE_SID=$(twilio messaging:services:create \
+  --friendly-name "AI Customer Service SMS" \
+  --query "sid" \
+  --output json | jq -r .)
+
+# Add phone number to messaging service
+twilio messaging:services:phone-numbers:create \
+  --service-sid $MESSAGING_SERVICE_SID \
+  --phone-number-sid $PHONE_NUMBER_SID
+
+echo "Created messaging service: $MESSAGING_SERVICE_SID"
+echo "Added phone number to messaging service"
+```
+
+##### 5. Configure Conversations Integration
+
+```bash
+# Configure the messaging service to use Conversations
+twilio messaging:services:update \
+  --sid $MESSAGING_SERVICE_SID \
+  --use-inbound-webhook-on-number false \
+  --inbound-method POST \
+  --inbound-request-url "${NGROK_URL}/webhook/message-added"
+
+# Create address configuration for Conversations
+twilio conversations:v1:address-configurations:create \
+  --type sms \
+  --address $PHONE_NUMBER \
+  --friendly-name "SMS Channel" \
+  --address-sid $MESSAGING_SERVICE_SID
+
+echo "Configured SMS integration with Conversations"
+```
+
+##### 6. WhatsApp Setup (Optional)
+
+```bash
+# Note: WhatsApp setup requires business verification
+# This creates the configuration, but you'll need to complete WhatsApp Business verification
+
+# Create WhatsApp sender (replace with your business phone number)
+WHATSAPP_NUMBER="+14155551234"  # Your verified WhatsApp business number
+
+# Configure WhatsApp for Conversations
+twilio conversations:v1:address-configurations:create \
+  --type whatsapp \
+  --address "whatsapp:$WHATSAPP_NUMBER" \
+  --friendly-name "WhatsApp Channel" \
+  --inbound-webhook-url "${NGROK_URL}/webhook/message-added" \
+  --inbound-method POST
+
+echo "Configured WhatsApp integration (requires business verification)"
+```
+
+##### 7. Update Environment Configuration
+
+```bash
+# Add the service SID to your .env file
+echo "TWILIO_CONVERSATIONS_SERVICE_SID=$CONVERSATIONS_SERVICE_SID" >> .env
+
+# Optionally save other IDs for reference
+echo "# Twilio Resource IDs (for reference)" >> .env
+echo "# PHONE_NUMBER_SID=$PHONE_NUMBER_SID" >> .env
+echo "# MESSAGING_SERVICE_SID=$MESSAGING_SERVICE_SID" >> .env
+echo "# PHONE_NUMBER=$PHONE_NUMBER" >> .env
+
+echo "Updated .env file with Conversations Service SID"
+```
+
+##### 8. Verify Configuration
+
+```bash
+# Test webhook endpoint
+curl -X POST "$NGROK_URL/webhook/test"
+
+# List all Conversations services
+twilio conversations:v1:services:list
+
+# Check service configuration
+twilio conversations:v1:services:configuration:fetch --path-sid $CONVERSATIONS_SERVICE_SID
+
+# Verify phone number configuration
+twilio phone-numbers:fetch $PHONE_NUMBER_SID
+```
+
+#### Option B: Using Twilio Console (Manual Setup)
+
+##### 1. Create a Conversations Service
 
 1. Log into the [Twilio Console](https://console.twilio.com/)
 2. Navigate to **Conversations > Services**
@@ -125,21 +287,21 @@ You should see the health check return a successful status.
 4. Give it a name like "AI Customer Service"
 5. Copy the **Service SID** (starts with `IS`) to your `.env` file
 
-#### 2. Configure Webhooks
+##### 2. Configure Webhooks
 
 1. In your Conversations Service, go to **Webhooks**
 2. Add webhook URLs for these events:
-   - **onMessageAdd**: `https://your-domain.com/webhook/message-added`
-   - **onParticipantAdd**: `https://your-domain.com/webhook/participant-added`
-   - **onConversationStateUpdate**: `https://your-domain.com/webhook/conversation-state-updated`
+   - **onMessageAdd**: `https://your-ngrok-url.ngrok.io/webhook/message-added`
+   - **onParticipantAdd**: `https://your-ngrok-url.ngrok.io/webhook/participant-added`
+   - **onConversationStateUpdate**: `https://your-ngrok-url.ngrok.io/webhook/conversation-state-updated`
 
-#### 3. Set Up Phone Number or Channel
+##### 3. Set Up Phone Number or Channel
 
-1. **For SMS**: Go to **Phone Numbers > Manage > Incoming phone numbers**
+1. **For SMS**: Go to **Phone Numbers > Manage > Buy a number**
 2. **For WhatsApp**: Go to **Messaging > WhatsApp > Senders**
 3. Configure the messaging service to use your Conversations Service
 
-#### 4. Local Development with ngrok
+##### 4. Local Development with ngrok
 
 For local testing, use ngrok to expose your webhook endpoints:
 
@@ -269,6 +431,116 @@ python -c "from src.services.session_service import SessionService; import async
 - Verify API key is correct and has credits
 - Check rate limits in OpenAI dashboard
 - Ensure model name is correct (e.g., `gpt-4o-mini`)
+
+#### 5. Twilio CLI Issues
+
+**Authentication Problems:**
+```bash
+# Check current profile
+twilio profiles:list
+
+# Re-authenticate if needed
+twilio login
+
+# Switch between profiles
+twilio profiles:use PROFILE_NAME
+```
+
+**Service Configuration Verification:**
+```bash
+# Check if Conversations service exists
+twilio conversations:v1:services:list
+
+# Verify service configuration
+CONVERSATIONS_SERVICE_SID="ISxxxxxxxxxxxxx"  # Your service SID
+twilio conversations:v1:services:configuration:fetch --path-sid $CONVERSATIONS_SERVICE_SID
+
+# Check webhook configuration
+twilio conversations:v1:services:configuration:webhooks:fetch --path-sid $CONVERSATIONS_SERVICE_SID
+```
+
+**Phone Number and Messaging Issues:**
+```bash
+# List all phone numbers
+twilio phone-numbers:list
+
+# Check phone number configuration
+PHONE_NUMBER_SID="PNxxxxxxxxxxxxx"  # Your phone number SID
+twilio phone-numbers:fetch $PHONE_NUMBER_SID
+
+# List messaging services
+twilio messaging:services:list
+
+# Check messaging service configuration
+MESSAGING_SERVICE_SID="MGxxxxxxxxxxxxx"  # Your messaging service SID
+twilio messaging:services:fetch $MESSAGING_SERVICE_SID
+
+# List phone numbers in messaging service
+twilio messaging:services:phone-numbers:list --service-sid $MESSAGING_SERVICE_SID
+```
+
+**Address Configuration Debugging:**
+```bash
+# List all address configurations
+twilio conversations:v1:address-configurations:list
+
+# Check specific address configuration
+ADDRESS_CONFIG_SID="IGxxxxxxxxxxxxx"  # Your address config SID
+twilio conversations:v1:address-configurations:fetch --sid $ADDRESS_CONFIG_SID
+```
+
+**Testing Webhook Connectivity:**
+```bash
+# Test webhook endpoint directly
+NGROK_URL="https://your-ngrok-url.ngrok.io"
+curl -X POST "$NGROK_URL/webhook/test" \
+  -H "Content-Type: application/json" \
+  -d '{"test": true}'
+
+# Check ngrok is running and accessible
+curl -I "$NGROK_URL"
+
+# Test from Twilio's perspective (replace with your service SID)
+twilio conversations:v1:services:configuration:webhooks:update \
+  --path-sid $CONVERSATIONS_SERVICE_SID \
+  --pre-webhook-url "${NGROK_URL}/webhook/test" \
+  --method POST
+```
+
+#### 6. Complete Setup Verification
+
+```bash
+# Run this complete verification script
+#!/bin/bash
+
+# Set your service SID
+CONVERSATIONS_SERVICE_SID="ISxxxxxxxxxxxxx"  # Replace with your actual SID
+
+echo "🔍 Verifying Twilio Setup..."
+
+# 1. Check Conversations service
+echo "1. Checking Conversations service..."
+twilio conversations:v1:services:fetch --sid $CONVERSATIONS_SERVICE_SID
+
+# 2. Check webhook configuration
+echo "2. Checking webhook configuration..."
+twilio conversations:v1:services:configuration:webhooks:fetch --path-sid $CONVERSATIONS_SERVICE_SID
+
+# 3. Check address configurations
+echo "3. Checking address configurations..."
+twilio conversations:v1:address-configurations:list
+
+# 4. Test webhook endpoint
+echo "4. Testing webhook endpoint..."
+NGROK_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+if [ "$NGROK_URL" != "null" ]; then
+    curl -X POST "$NGROK_URL/webhook/test"
+else
+    echo "❌ ngrok not running or not accessible"
+fi
+
+echo "✅ Verification complete!"
+```
 
 ### Logs and Debugging
 

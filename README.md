@@ -37,7 +37,67 @@ cp .env.example .env
 # Edit .env with your Twilio and OpenAI credentials
 ```
 
-### 3. Run the Application
+### 3. Set Up Twilio Service & Phone Number
+
+**Option A: Automated CLI Setup (Recommended)**
+```bash
+# Use our automated setup script with Twilio CLI option
+./scripts/setup.sh
+# Then select option 6: "Twilio CLI setup"
+# This will automatically:
+# - Install/configure Twilio CLI
+# - Create Conversations service
+# - Configure webhooks
+# - Purchase phone number
+# - Set up messaging service
+# - Update your .env file
+```
+
+**Option B: Manual CLI Commands**
+```bash
+# Install Twilio CLI if not already installed
+npm install -g twilio-cli
+
+# Login to Twilio (opens browser for authentication)
+twilio login
+
+# Create Conversations service
+CONVERSATIONS_SERVICE_SID=$(twilio api:conversations:v1:services:create \
+  --friendly-name "AI Customer Service" \
+  --query "sid" --output json | jq -r .)
+
+# Configure webhooks (replace YOUR_NGROK_URL with your ngrok URL from step 5)
+twilio api:conversations:v1:services:configuration:webhooks:update \
+  --path-sid $CONVERSATIONS_SERVICE_SID \
+  --pre-webhook-url https://YOUR_NGROK_URL/webhook/message-added \
+  --method POST
+
+# Purchase a phone number and set up SMS
+PHONE_NUMBER_SID=$(twilio phone-numbers:buy:local \
+  --country-code US --sms-enabled \
+  --query "sid" --output json | jq -r .)
+
+# Create messaging service and add phone number
+MESSAGING_SERVICE_SID=$(twilio messaging:services:create \
+  --friendly-name "AI Customer Service SMS" \
+  --query "sid" --output json | jq -r .)
+
+twilio messaging:services:phone-numbers:create \
+  --service-sid $MESSAGING_SERVICE_SID \
+  --phone-number-sid $PHONE_NUMBER_SID
+
+# Update your .env file with the service SID
+echo "TWILIO_CONVERSATIONS_SERVICE_SID=$CONVERSATIONS_SERVICE_SID" >> .env
+```
+
+**Option C: Using Twilio Console (Manual)**
+1. Go to [Twilio Console](https://console.twilio.com/)
+2. Create Conversations Service: **Conversations > Services > Create new Service**
+3. Configure webhooks in the service settings
+4. Set up phone number: **Phone Numbers > Buy a number**
+5. Copy Service SID to your `.env` file
+
+### 4. Run the Application
 ```bash
 # Using Docker (recommended)
 docker-compose up
@@ -47,10 +107,11 @@ source venv/bin/activate
 python -m uvicorn src.main:app --reload
 ```
 
-### 4. Expose Webhooks (for local development)
+### 5. Expose Webhooks (for local development)
 ```bash
 ngrok http 8000
-# Configure Twilio webhooks to use the ngrok HTTPS URL
+# Copy the HTTPS URL and update YOUR_NGROK_URL in the CLI commands above
+# Or configure webhooks manually in Twilio Console
 ```
 
 🎉 **That's it!** Your AI-powered customer service agent is ready to handle conversations.

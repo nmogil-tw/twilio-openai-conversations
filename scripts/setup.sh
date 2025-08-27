@@ -95,8 +95,9 @@ echo "2. Dependencies only (install Python packages)"
 echo "3. Configuration only (setup .env file)"
 echo "4. Database initialization"
 echo "5. Docker setup"
+echo "6. Twilio CLI setup (configure Conversations service)"
 
-read -p "Choose an option (1-5): " SETUP_OPTION
+read -p "Choose an option (1-6): " SETUP_OPTION
 
 case $SETUP_OPTION in
     1)
@@ -135,6 +136,11 @@ case $SETUP_OPTION in
             print_error "docker-compose.yml not found"
             exit 1
         fi
+        ;;
+    6)
+        print_status "Setting up Twilio CLI configuration..."
+        setup_twilio_cli
+        exit 0
         ;;
     *)
         print_error "Invalid option selected"
@@ -263,6 +269,203 @@ asyncio.run(init_db())
         echo "  python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
     }
 fi
+
+# Function to setup Twilio CLI and create services
+setup_twilio_cli() {
+    print_status "Setting up Twilio CLI and creating services..."
+    
+    # Check if Twilio CLI is installed
+    if ! check_command "twilio"; then
+        print_status "Installing Twilio CLI..."
+        if check_command "npm"; then
+            npm install -g twilio-cli
+        else
+            print_error "npm is required to install Twilio CLI"
+            print_status "Please install Node.js and npm, then run: npm install -g twilio-cli"
+            return 1
+        fi
+    fi
+    
+    # Check if jq is available
+    if ! check_command "jq"; then
+        print_warning "jq is not installed - some commands may not work properly"
+        print_status "Install jq with: brew install jq (macOS) or apt-get install jq (Linux)"
+    fi
+    
+    # Login to Twilio
+    print_status "Logging into Twilio..."
+    if ! twilio profiles:list >/dev/null 2>&1; then
+        print_status "Please authenticate with Twilio..."
+        twilio login
+    else
+        print_success "Already logged into Twilio"
+    fi
+    
+    # Check if ngrok is running
+    NGROK_URL=""
+    if check_command "curl" && curl -s localhost:4040/api/tunnels >/dev/null 2>&1; then
+        if check_command "jq"; then
+            NGROK_URL=$(curl -s localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url // empty')
+        fi
+    fi
+    
+    if [ -z "$NGROK_URL" ]; then
+        print_warning "ngrok doesn't appear to be running"
+        print_status "Please start ngrok in another terminal: ngrok http 8000"
+        read -p "Enter your ngrok HTTPS URL (e.g., https://abc123.ngrok.io): " NGROK_URL
+        
+        if [[ ! "$NGROK_URL" =~ ^https:// ]]; then
+            print_error "Webhook URL must be HTTPS"
+            return 1
+        fi
+    else
+        print_success "Detected ngrok URL: $NGROK_URL"
+    fi
+    
+    # Create Conversations service
+    print_status "Creating Twilio Conversations service..."
+    
+    if check_command "jq"; then
+        CONVERSATIONS_SERVICE_SID=$(twilio api:conversations:v1:services:create \
+            --friendly-name "AI Customer Service" \
+            --query "sid" \
+            --output json | jq -r .)
+    else
+        # Fallback without jq
+        print_status "Creating service (manual SID extraction needed)..."
+        twilio api:conversations:v1:services:create --friendly-name "AI Customer Service"
+        print_status "Please copy the Service SID from the output above"
+        read -p "Enter the Conversations Service SID (starts with IS): " CONVERSATIONS_SERVICE_SID
+    fi
+    
+    if [ -z "$CONVERSATIONS_SERVICE_SID" ] || [ "$CONVERSATIONS_SERVICE_SID" = "null" ]; then
+        print_error "Failed to create Conversations service"
+        return 1
+    fi
+    
+    print_success "Created Conversations service: $CONVERSATIONS_SERVICE_SID"
+    
+    # Configure webhooks
+    print_status "Configuring webhooks..."
+    twilio api:conversations:v1:services:configuration:webhooks:update \
+        --path-sid "$CONVERSATIONS_SERVICE_SID" \
+        --pre-webhook-url "${NGROK_URL}/webhook/message-added" \
+        --method POST \
+        --filters "onMessageAdded" \
+        --filters "onParticipantAdded" \
+        --filters "onConversationStateUpdated"
+    
+    print_success "Configured webhooks"
+    
+    # Ask about phone number setup
+    echo ""
+    read -p "Do you want to set up SMS with a phone number? (y/N): " SETUP_SMS
+    
+    if [ "$SETUP_SMS" = "y" ] || [ "$SETUP_SMS" = "Y" ]; then
+        setup_sms_service "$CONVERSATIONS_SERVICE_SID" "$NGROK_URL"
+    fi
+    
+    # Update .env file
+    print_status "Updating .env file..."
+    if [ ! -f ".env" ]; then
+        cp .env.example .env
+    fi
+    
+    # Update or add the Conversations Service SID
+    if grep -q "TWILIO_CONVERSATIONS_SERVICE_SID=" .env; then
+        sed -i.bak "s/TWILIO_CONVERSATIONS_SERVICE_SID=.*/TWILIO_CONVERSATIONS_SERVICE_SID=$CONVERSATIONS_SERVICE_SID/" .env
+    else
+        echo "TWILIO_CONVERSATIONS_SERVICE_SID=$CONVERSATIONS_SERVICE_SID" >> .env
+    fi
+    
+    rm -f .env.bak
+    
+    print_success "Twilio CLI setup completed!"
+    print_status "Next steps:"
+    echo "1. Configure your OpenAI API key in .env"
+    echo "2. Start your application: python -m uvicorn src.main:app --reload"
+    echo "3. Test by sending an SMS to your phone number (if configured)"
+}
+
+# Function to setup SMS service
+setup_sms_service() {
+    local conversations_service_sid="$1"
+    local ngrok_url="$2"
+    
+    print_status "Setting up SMS service..."
+    
+    # Search for available numbers
+    print_status "Searching for available phone numbers..."
+    twilio phone-numbers:list:local --country-code US --sms-enabled --limit 5
+    
+    echo ""
+    read -p "Enter area code for phone number (e.g., 415): " AREA_CODE
+    AREA_CODE=${AREA_CODE:-415}
+    
+    # Purchase phone number
+    print_status "Purchasing phone number with area code $AREA_CODE..."
+    
+    if check_command "jq"; then
+        PHONE_NUMBER_SID=$(twilio phone-numbers:buy:local \
+            --country-code US \
+            --area-code "$AREA_CODE" \
+            --sms-enabled \
+            --query "sid" \
+            --output json | jq -r .)
+        
+        PHONE_NUMBER=$(twilio phone-numbers:fetch "$PHONE_NUMBER_SID" \
+            --query "phoneNumber" \
+            --output json | jq -r .)
+    else
+        # Fallback without jq
+        twilio phone-numbers:buy:local --country-code US --area-code "$AREA_CODE" --sms-enabled
+        print_status "Please copy the Phone Number SID and number from the output above"
+        read -p "Enter the Phone Number SID (starts with PN): " PHONE_NUMBER_SID
+        read -p "Enter the phone number (e.g., +14155551234): " PHONE_NUMBER
+    fi
+    
+    if [ -z "$PHONE_NUMBER_SID" ] || [ "$PHONE_NUMBER_SID" = "null" ]; then
+        print_error "Failed to purchase phone number"
+        return 1
+    fi
+    
+    print_success "Purchased phone number: $PHONE_NUMBER (SID: $PHONE_NUMBER_SID)"
+    
+    # Create messaging service
+    print_status "Creating messaging service..."
+    
+    if check_command "jq"; then
+        MESSAGING_SERVICE_SID=$(twilio messaging:services:create \
+            --friendly-name "AI Customer Service SMS" \
+            --query "sid" \
+            --output json | jq -r .)
+    else
+        twilio messaging:services:create --friendly-name "AI Customer Service SMS"
+        read -p "Enter the Messaging Service SID (starts with MG): " MESSAGING_SERVICE_SID
+    fi
+    
+    # Add phone number to messaging service
+    twilio messaging:services:phone-numbers:create \
+        --service-sid "$MESSAGING_SERVICE_SID" \
+        --phone-number-sid "$PHONE_NUMBER_SID"
+    
+    # Create address configuration for Conversations
+    twilio conversations:v1:address-configurations:create \
+        --type sms \
+        --address "$PHONE_NUMBER" \
+        --friendly-name "SMS Channel" \
+        --address-sid "$MESSAGING_SERVICE_SID"
+    
+    print_success "SMS service configured successfully!"
+    print_status "You can now send SMS messages to $PHONE_NUMBER"
+    
+    # Save IDs to .env for reference
+    echo "" >> .env
+    echo "# Twilio Resource IDs (for reference)" >> .env
+    echo "# PHONE_NUMBER_SID=$PHONE_NUMBER_SID" >> .env
+    echo "# MESSAGING_SERVICE_SID=$MESSAGING_SERVICE_SID" >> .env
+    echo "# PHONE_NUMBER=$PHONE_NUMBER" >> .env
+}
 
 # Function to configure credentials interactively
 configure_credentials() {

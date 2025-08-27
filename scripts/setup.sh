@@ -87,66 +87,27 @@ check_command "docker" || print_warning "Docker not found - Docker deployment wo
 check_command "docker-compose" || print_warning "Docker Compose not found - Docker deployment won't be available"
 check_command "ngrok" || print_warning "ngrok not found - local webhook testing will require manual tunneling"
 
-# Setup options
+# Automatic setup
+print_status "Setting up Twilio + OpenAI Conversations..."
 echo ""
-print_status "Setup Options:"
-echo "1. Full setup (virtual environment, dependencies, configuration)"
-echo "2. Dependencies only (install Python packages)"
-echo "3. Configuration only (setup .env file)"
-echo "4. Database initialization"
-echo "5. Docker setup"
-echo "6. Twilio CLI setup (configure Conversations service)"
+echo "This will:"
+echo "✓ Create Python virtual environment"  
+echo "✓ Install dependencies"
+echo "✓ Set up configuration files"
+echo "✓ Initialize database"
+echo ""
 
-read -p "Choose an option (1-6): " SETUP_OPTION
+read -p "Continue? (Y/n): " CONTINUE
+if [ "$CONTINUE" = "n" ] || [ "$CONTINUE" = "N" ]; then
+    print_status "Setup cancelled"
+    exit 0
+fi
 
-case $SETUP_OPTION in
-    1)
-        SETUP_VENV=true
-        SETUP_DEPS=true
-        SETUP_CONFIG=true
-        SETUP_DB=true
-        ;;
-    2)
-        SETUP_VENV=false
-        SETUP_DEPS=true
-        SETUP_CONFIG=false
-        SETUP_DB=false
-        ;;
-    3)
-        SETUP_VENV=false
-        SETUP_DEPS=false
-        SETUP_CONFIG=true
-        SETUP_DB=false
-        ;;
-    4)
-        SETUP_VENV=false
-        SETUP_DEPS=false
-        SETUP_CONFIG=false
-        SETUP_DB=true
-        ;;
-    5)
-        print_status "Setting up Docker environment..."
-        if [ -f "docker-compose.yml" ]; then
-            docker-compose up -d
-            print_success "Docker environment started"
-            print_status "Access the application at http://localhost:8000"
-            print_status "API documentation at http://localhost:8000/docs"
-            exit 0
-        else
-            print_error "docker-compose.yml not found"
-            exit 1
-        fi
-        ;;
-    6)
-        print_status "Setting up Twilio CLI configuration..."
-        setup_twilio_cli
-        exit 0
-        ;;
-    *)
-        print_error "Invalid option selected"
-        exit 1
-        ;;
-esac
+# Set all flags to true for simple setup
+SETUP_VENV=true
+SETUP_DEPS=true
+SETUP_CONFIG=true
+SETUP_DB=true
 
 # Virtual environment setup
 if [ "$SETUP_VENV" = true ]; then
@@ -552,23 +513,16 @@ if test_installation; then
     print_success "Installation test passed"
     
     echo ""
-    print_status "Next steps:"
-    echo "1. Configure your Twilio webhooks to point to your application"
-    echo "2. For local development, use ngrok to expose your webhook endpoints:"
-    echo "   ngrok http 8000"
-    echo "3. Start the application:"
-    if [ -d "venv" ]; then
-        echo "   source venv/bin/activate"
-    fi
-    echo "   python -m uvicorn src.main:app --reload"
-    echo "4. Visit http://localhost:8000/health to verify the application is running"
-    echo "5. Visit http://localhost:8000/docs for API documentation"
-    
+    print_success "🎉 You're ready to go! Next steps:"
     echo ""
-    print_status "For more information, see:"
-    echo "  - docs/setup.md for detailed setup instructions"
-    echo "  - docs/configuration.md for advanced configuration options"
-    echo "  - docs/deployment.md for production deployment"
+    echo "1. Add your credentials to .env file"
+    echo "2. Start the application: docker-compose up"
+    echo "3. Expose with ngrok: ngrok http 8000"
+    echo "4. Configure Twilio webhooks (we can help with this!)"
+    echo "5. Test by sending an SMS to your Twilio number"
+    echo ""
+    echo "Visit http://localhost:8000/health to verify everything works!"
+    echo "Need help? Check docs/setup.md for detailed guides."
 else
     print_warning "Installation test failed - please check your configuration"
 fi

@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Main application - just add your .env file and run!
   app:
     build:
       context: .
@@ -8,52 +9,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./conversations.db
       - DEBUG=true
-      - LOG_LEVEL=INFO
+      - DATABASE_URL=sqlite:///./data/conversations.db
     env_file:
       - .env
     volumes:
-      - .:/app
-      - ./data:/app/data  # For SQLite database persistence
-    depends_on:
-      - redis
-    networks:
-      - twilio-openai-network
+      - ./data:/app/data  # Database persistence
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - twilio-openai-network
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-
-  # Optional: PostgreSQL for production-like environment
-  postgres:
-    image: postgres:15-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: conversations
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - twilio-openai-network
-    restart: unless-stopped
-    profiles:
-      - postgres
+  # Optional services (uncomment if needed for production)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379" 
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
 
 volumes:
   redis_data:
-  postgres_data:
-
-networks:
-  twilio-openai-network:
-    driver: bridge

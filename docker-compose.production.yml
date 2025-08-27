@@ -1,0 +1,62 @@
+version: '3.8'
+
+# Production Docker Compose with Redis, PostgreSQL, and monitoring
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
+
+services:
+  app:
+    environment:
+      - DEBUG=false
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/conversations
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - production-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - production-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: conversations
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - production-network
+    restart: unless-stopped
+
+  # Optional: nginx reverse proxy
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - production-network
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  production-network:
+    driver: bridge

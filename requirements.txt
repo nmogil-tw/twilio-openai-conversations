@@ -2,10 +2,8 @@
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# OpenAI Agents SDK
-openai>=1.12.0
-# TODO: Replace with actual OpenAI Agents SDK when available
-# openai-agents-sdk>=1.0.0
+# OpenAI Agents SDK - MUST uninstall conflicting 'agents' package first
+openai-agents
 
 # Twilio SDK
 twilio>=8.10.0
@@ -13,6 +11,7 @@ twilio>=8.10.0
 # Database & Session Management
 sqlalchemy>=2.0.0
 alembic>=1.13.0
+aiosqlite>=0.19.0  # Async SQLite driver
 # sqlite3 is built-in Python module
 psycopg2-binary>=2.9.0  # PostgreSQL driver for production
 

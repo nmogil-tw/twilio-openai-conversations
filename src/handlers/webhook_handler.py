@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 # Create FastAPI router
 router = APIRouter()
 
-# Initialize services (TODO: Move to dependency injection)
+# Initialize services - can be moved to dependency injection for larger applications
 agent_service = CustomerServiceAgent()
 twilio_service = TwilioConversationService()
 session_service = SessionService()
@@ -62,17 +62,31 @@ async def handle_message_added(
         
         logger.info("Processing message-added webhook", extra=processing_context)
         
-        # TODO: Fix webhook signature validation bug - "string indices must be integers, not 'str'"
-        # IMPORTANT: Re-enable for production security - signature validation prevents replay attacks
-        # Validate webhook signature
-        # if settings.twilio.webhook_secret and x_twilio_signature:
-        #     url = str(request.url)
-        #     is_valid_signature = await twilio_service.validate_webhook_signature(
-        #         raw_body.decode(), x_twilio_signature, url
-        #     )
-        #     if not is_valid_signature:
-        #         logger.warning("Invalid webhook signature", extra=processing_context)
-        #         raise HTTPException(status_code=403, detail="Invalid webhook signature")
+        # Validate webhook signature for security
+        if settings.twilio.auth_token and x_twilio_signature:
+            # Use the original URL from X-Forwarded-Proto and Host headers if available (for ngrok)
+            forwarded_proto = request.headers.get('X-Forwarded-Proto', 'https')
+            forwarded_host = request.headers.get('X-Forwarded-Host') or request.headers.get('Host')
+            
+            if forwarded_host and 'ngrok' in forwarded_host:
+                # Construct the external ngrok URL for signature validation
+                url = f"{forwarded_proto}://{forwarded_host}{request.url.path}"
+                if request.url.query:
+                    url += f"?{request.url.query}"
+            else:
+                # Fall back to the original URL
+                url = str(request.url)
+                
+            # Convert raw body to string for signature validation
+            body_str = raw_body.decode('utf-8') if isinstance(raw_body, bytes) else raw_body
+            is_valid_signature = validate_webhook_signature(
+                body_str, x_twilio_signature, url
+            )
+            if not is_valid_signature:
+                logger.warning(f"Invalid webhook signature for URL: {url}", extra=processing_context)
+                raise HTTPException(status_code=403, detail="Invalid webhook signature")
+            else:
+                logger.debug("Webhook signature validated successfully")
         
         # Parse webhook data
         try:

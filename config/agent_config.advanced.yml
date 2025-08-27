@@ -1,0 +1,82 @@
+# Advanced Agent Configuration
+# Copy sections to agent_config.yml if you need to customize them
+
+customer_service_agent:
+  # Advanced Settings
+  settings:
+    max_tokens: 150
+    temperature: 0.7
+    top_p: 0.9
+    frequency_penalty: 0.0
+    presence_penalty: 0.0
+  
+  # Available tools/functions
+  tools:
+    - lookup_order_status
+    - get_product_info
+    - check_store_hours
+    - get_store_locations
+    - search_faq
+  
+  # Predefined responses
+  fallback_responses:
+    unknown_query: "I'm not sure about that. Please contact customer service."
+    billing_issues: "For billing questions, please contact billing@acme.com"
+    returns_refunds: "For returns, please visit acme.com/returns"
+    technical_support: "For tech support, please contact support@acme.com"
+    escalation: "Let me connect you with a human agent."
+    
+  # Error handling responses
+  error_responses:
+    api_error: "I'm experiencing technical difficulties. Please try again."
+    rate_limit: "High volume right now. Please try again in a moment."
+    timeout: "Taking longer than usual. Please try your question again."
+    
+  # Extended business information
+  knowledge_base:
+    product_categories:
+      - "Electronics"
+      - "Clothing & Accessories"
+      - "Home & Garden"
+      - "Sports & Outdoors"
+      - "Books & Media"
+    
+    faq_topics:
+      - "Shipping Information"
+      - "Return Policy"
+      - "Payment Methods"
+      - "Order Tracking"
+      - "Account Management"
+      - "Product Warranty"
+    
+    # Conversation flow settings
+    conversation:
+      max_history_length: 50
+      context_window: 10
+      session_timeout_minutes: 30
+      
+      # Greeting messages
+      greetings:
+        - "Hi! I'm here to help with your questions. How can I assist you today?"
+        - "Hello! Welcome to Acme Corp customer service. What can I help you with?"
+        - "Hi there! I'm your customer service assistant. How may I help you?"
+      
+      # Closing messages
+      closings:
+        - "Is there anything else I can help you with today?"
+        - "Thank you for contacting Acme Corp! Have a great day!"
+        - "I'm here if you need any other assistance. Have a wonderful day!"
+
+# Multi-agent configuration (for enterprise setups)
+agents:
+  customer_service:
+    name: "Customer Service Assistant"
+    specializes_in: ["general", "orders", "products"]
+  
+  billing_specialist:
+    name: "Billing Specialist"
+    specializes_in: ["billing", "payments", "invoices"]
+  
+  technical_support:
+    name: "Technical Support"
+    specializes_in: ["troubleshooting", "setup", "technical_issues"]

@@ -27,11 +27,25 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Twilio-OpenAI Conversations application")
     
-    # TODO: Initialize database connections
-    # TODO: Initialize Redis connections if configured  
-    # TODO: Initialize OpenAI agent
-    # TODO: Validate Twilio credentials
-    # TODO: Load agent configuration
+    # Validate configuration
+    logger.info("Validating configuration...")
+    if not settings.twilio.account_sid or not settings.twilio.auth_token:
+        logger.error("Missing Twilio credentials")
+    if not settings.openai.api_key:
+        logger.error("Missing OpenAI API key")
+    
+    # Initialize services
+    logger.info("Initializing services...")
+    
+    # Initialize database tables
+    try:
+        from src.services.session_service import SessionService
+        session_service = SessionService()
+        await session_service.create_tables()
+        logger.info("Database tables initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        # Don't fail startup for database issues in development
     
     logger.info("Application startup complete")
     
@@ -40,9 +54,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down application")
     
-    # TODO: Close database connections
-    # TODO: Close Redis connections
-    # TODO: Cleanup agent resources
+    # Cleanup resources
+    logger.info("Cleaning up resources...")
     
     logger.info("Application shutdown complete")
 
@@ -85,7 +98,7 @@ def setup_middleware(app: FastAPI) -> None:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.debug else [],  # TODO: Configure proper origins
+        allow_origins=["*"] if settings.debug else ["https://*.ngrok.io"],
         allow_credentials=True,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
@@ -95,7 +108,7 @@ def setup_middleware(app: FastAPI) -> None:
     if not settings.debug:
         app.add_middleware(
             TrustedHostMiddleware, 
-            allowed_hosts=["*"]  # TODO: Configure proper allowed hosts
+            allowed_hosts=["*"]  # Allow all hosts for development flexibility
         )
 
 

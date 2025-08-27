@@ -15,26 +15,13 @@ class TestCustomerServiceAgent:
     """Test cases for CustomerServiceAgent class."""
     
     @pytest.fixture
-    def mock_openai_client(self):
-        """Mock OpenAI client for testing."""
-        with patch('src.services.agent_service.OpenAI') as mock_openai:
-            mock_client = Mock()
-            mock_openai.return_value = mock_client
-            
-            # Mock chat completion response
-            mock_choice = Mock()
-            mock_choice.message.content = "I'd be happy to help with your order!"
-            
-            mock_usage = Mock()
-            mock_usage.total_tokens = 45
-            
-            mock_response = Mock()
-            mock_response.choices = [mock_choice]
-            mock_response.usage = mock_usage
-            
-            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-            
-            yield mock_client
+    def mock_runner(self):
+        """Mock Agents SDK Runner for testing."""
+        with patch('src.services.agent_service.Runner') as mock_runner:
+            mock_result = Mock()
+            mock_result.final_output = "I'd be happy to help with your order!"
+            mock_runner.run = AsyncMock(return_value=mock_result)
+            yield mock_runner
     
     @pytest.fixture
     def mock_agent_config(self):
@@ -61,17 +48,18 @@ class TestCustomerServiceAgent:
         with patch.object(CustomerServiceAgent, '_load_agent_config', return_value=config):
             yield config
     
-    def test_agent_initialization(self, mock_openai_client, mock_agent_config):
+    def test_agent_initialization(self, mock_runner, mock_agent_config):
         """Test agent initialization with configuration."""
         agent = CustomerServiceAgent()
         
         assert agent is not None
-        assert agent.client is not None
         assert agent.config == mock_agent_config
-        assert agent.knowledge_base == mock_agent_config["knowledge_base"]
+        assert agent.main_agent is not None
+        assert agent.billing_agent is not None
+        assert agent.technical_agent is not None
     
     @pytest.mark.asyncio
-    async def test_process_message_success(self, mock_openai_client, mock_agent_config):
+    async def test_process_message_success(self, mock_runner, mock_agent_config):
         """Test successful message processing."""
         agent = CustomerServiceAgent()
         
@@ -87,7 +75,7 @@ class TestCustomerServiceAgent:
         assert "model_used" in response.metadata
     
     @pytest.mark.asyncio
-    async def test_process_message_with_context(self, mock_openai_client, mock_agent_config):
+    async def test_process_message_with_context(self, mock_runner, mock_agent_config):
         """Test message processing with conversation context."""
         agent = CustomerServiceAgent()
         

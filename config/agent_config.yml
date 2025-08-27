@@ -1,127 +1,28 @@
-# Agent Configuration for Customer Service Assistant
-# This file defines the behavior, capabilities, and responses of the AI agent
+# OpenAI Agents SDK Configuration
 
-customer_service_agent: &customer_service_agent
-  name: "Customer Service Assistant"
-  model: "gpt-4o-mini"
-  
-  # Core instructions that define the agent's personality and behavior
+customer_service_agent:
+  # Agent Instructions - These get passed to the Agent() constructor
   instructions: |
     You are a helpful customer service assistant for Acme Corp.
     
-    ## Your Capabilities:
-    - Look up order status using order numbers
-    - Provide product information from our catalog
-    - Check store hours and locations
-    - Answer frequently asked questions
-    - Help with basic account inquiries
+    Use your available tools to help customers with:
+    - Order status inquiries (use lookup_order_status tool)
+    - Product information (use get_product_info tool)
+    - Store hours and locations (use check_store_hours and get_store_locations tools)
+    - General questions (use search_faq tool)
     
-    ## Guidelines:
-    - Be friendly, professional, and concise
-    - Always ask for order numbers when helping with orders
-    - If you don't know something, politely say so and suggest contacting customer service
-    - Keep responses under 160 characters when possible for SMS compatibility
-    - Use natural, conversational language
-    - Avoid technical jargon
-    - Be empathetic and understanding
-    
-    ## Response Format:
-    - Prioritize clarity and helpfulness
-    - Use bullet points for lists when appropriate
-    - Include next steps when relevant
-    - End with an offer to help further when appropriate
-  
-  # Available tools/functions the agent can use
-  tools:
-    - lookup_order_status
-    - get_product_info
-    - check_store_hours
-    - get_store_locations
-    - search_faq
-  
-  # Configuration for agent behavior
-  settings:
-    max_tokens: 150  # Limit response length for SMS compatibility
-    temperature: 0.7  # Balance between creativity and consistency
-    top_p: 0.9
-    frequency_penalty: 0.0
-    presence_penalty: 0.0
-  
-  # Predefined responses for common scenarios
-  fallback_responses:
-    unknown_query: "I'm not sure about that. For more complex questions, please contact our customer service at 1-800-ACME-HELP."
-    billing_issues: "For billing questions, please contact our billing department at billing@acme.com or 1-800-ACME-BILL."
-    returns_refunds: "For returns and refunds, please visit acme.com/returns or contact customer service at 1-800-ACME-HELP."
-    technical_support: "For technical support, please contact our tech team at support@acme.com or visit acme.com/support."
-    escalation: "I'll connect you with a human agent who can better assist you. Please hold while I transfer your conversation."
-    
-  # Error handling responses
-  error_responses:
-    api_error: "I'm experiencing technical difficulties. Please try again in a moment or contact customer service."
-    rate_limit: "I'm experiencing high volume right now. Please try again in a moment."
-    timeout: "I'm taking longer than usual to respond. Please try your question again."
-    
-  # Knowledge base configuration
+    Be friendly, professional, and concise. Always ask for order numbers when helping with orders.
+    If you need specialized help with billing or technical issues, you can handoff to specialist agents.
+    Keep responses under 160 characters when possible for SMS compatibility.
+
+  # Business Information - Used by the function tools
   knowledge_base:
-    # Store information
     store_hours:
       weekdays: "9:00 AM - 9:00 PM"
       saturday: "9:00 AM - 8:00 PM"  
       sunday: "11:00 AM - 6:00 PM"
-      holidays: "11:00 AM - 5:00 PM"
     
-    # Contact information
     contact_info:
       customer_service: "1-800-ACME-HELP"
-      billing: "1-800-ACME-BILL"
       email: "help@acme.com"
       website: "acme.com"
-    
-    # Sample product categories for demo
-    product_categories:
-      - "Electronics"
-      - "Clothing & Accessories"
-      - "Home & Garden"
-      - "Sports & Outdoors"
-      - "Books & Media"
-    
-    # Sample FAQ topics
-    faq_topics:
-      - "Shipping Information"
-      - "Return Policy"
-      - "Payment Methods"
-      - "Order Tracking"
-      - "Account Management"
-      - "Product Warranty"
-    
-  # Conversation flow settings
-  conversation:
-    max_history_length: 50  # Number of previous messages to consider
-    context_window: 10      # Number of recent messages for immediate context
-    session_timeout_minutes: 30
-    
-    # Greeting messages
-    greetings:
-      - "Hi! I'm here to help with your questions. How can I assist you today?"
-      - "Hello! Welcome to Acme Corp customer service. What can I help you with?"
-      - "Hi there! I'm your customer service assistant. How may I help you?"
-    
-    # Closing messages
-    closings:
-      - "Is there anything else I can help you with today?"
-      - "Thank you for contacting Acme Corp! Have a great day!"
-      - "I'm here if you need any other assistance. Have a wonderful day!"
-
-# Multi-agent configuration (for future expansion)
-agents:
-  customer_service:
-    <<: *customer_service_agent
-  
-  # Future agents can be added here
-  # billing_specialist:
-  #   name: "Billing Specialist"
-  #   specializes_in: ["billing", "payments", "invoices"]
-  
-  # technical_support:
-  #   name: "Technical Support"
-  #   specializes_in: ["troubleshooting", "setup", "technical_issues"]

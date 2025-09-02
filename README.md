@@ -47,9 +47,12 @@ Update your Conversations service to use the ngrok URL:
 # Copy your ngrok URL (e.g., https://abc123.ngrok.app)
 # Then configure the webhook:
 twilio api:conversations:v1:services:configuration:webhooks:update \
-    --chat-service-sid ISxxxxxxxxxxxxx \
-    --post-webhook-url https://abc123.ngrok.app/webhook/message-added \
-    --webhook-filters onMessageAdded
+    --path-sid ISxxxxxxxxxxxxx \
+    --pre-webhook-url https://abc123.ngrok.app/webhook/message-added \
+    --method POST \
+    --filters onMessageAdded \
+    --filters onParticipantAdded \
+    --filters onConversationStateUpdated
 ```
 
 **Done!** Text your Twilio number to chat with your AI assistant.
@@ -282,6 +285,43 @@ The SDK automatically sends traces to OpenAI for monitoring:
 ```
 
 ## Troubleshooting
+
+### Common Setup Issues:
+
+**Setup Script Errors:**
+```bash
+# If you get "configure_credentials: command not found"
+# Make sure you're running the script with: ./scripts/setup.sh
+# (not: bash scripts/setup.sh or sh scripts/setup.sh)
+
+# If database initialization fails with "No module named 'sqlalchemy'"
+# The virtual environment may not be activated properly
+# Run manually: source venv/bin/activate && python3 -c "from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())"
+```
+
+**Twilio CLI Issues:**
+```bash
+# If you get "Unexpected arguments: --webhook-filters"
+# Use the correct command format:
+twilio api:conversations:v1:services:configuration:webhooks:update \
+    --path-sid ISxxxxxxxxxxxxx \
+    --pre-webhook-url https://your-ngrok-url.ngrok.app/webhook/message-added \
+    --method POST \
+    --filters onMessageAdded
+```
+
+**Webhook Signature Validation Issues:**
+```bash
+# If webhooks fail with "Invalid webhook signature" during development:
+# Option 1: Disable signature validation temporarily (NOT for production)
+echo "VALIDATE_WEBHOOK_SIGNATURES=false" >> .env
+
+# Option 2: Enable debug mode to see signature validation details
+echo "DEBUG=true" >> .env
+
+# For production: ensure ngrok URL exactly matches webhook configuration
+# and that TWILIO_AUTH_TOKEN is correctly set
+```
 
 ### Common Deployment Issues:
 

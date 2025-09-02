@@ -42,6 +42,7 @@ class ApplicationSettings(BaseSettings):
     
     # Security Configuration
     webhook_secret: Optional[str] = Field(None, env="WEBHOOK_SECRET")
+    validate_webhook_signatures: bool = Field(default=True, env="VALIDATE_WEBHOOK_SIGNATURES")
     rate_limit_per_minute: int = Field(default=60, env="RATE_LIMIT_PER_MINUTE")
     max_concurrent_conversations: int = Field(default=100, env="MAX_CONCURRENT_CONVERSATIONS")
     
@@ -117,6 +118,7 @@ class ApplicationSettings(BaseSettings):
         class SecurityProxy:
             def __init__(self, settings):
                 self.webhook_secret = settings.webhook_secret
+                self.validate_webhook_signatures = settings.validate_webhook_signatures
                 self.rate_limit_per_minute = settings.rate_limit_per_minute
                 self.max_concurrent_conversations = settings.max_concurrent_conversations
         return SecurityProxy(self)

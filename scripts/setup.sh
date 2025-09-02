@@ -5,6 +5,9 @@
 
 set -e
 
+# Ensure functions are properly sourced by defining them at the top level
+# This prevents "command not found" errors during execution
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -205,16 +208,13 @@ fi
 if [ "$SETUP_DB" = true ]; then
     print_status "Initializing database..."
     
-    # Activate virtual environment if it exists
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-    fi
-    
     # Create data directory
     mkdir -p data
     
-    # Initialize database tables
-    python3 -c "
+    # Initialize database tables - ensure virtual environment is active
+    if [ -d "venv" ]; then
+        print_status "Using virtual environment for database initialization..."
+        venv/bin/python3 -c "
 import asyncio
 from src.services.session_service import SessionService
 
@@ -225,10 +225,28 @@ async def init_db():
 
 asyncio.run(init_db())
 " 2>/dev/null || {
-        print_warning "Database initialization failed - make sure dependencies are installed"
-        print_status "You can run database initialization later with:"
-        echo "  python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
-    }
+            print_warning "Database initialization failed - make sure dependencies are installed"
+            print_status "You can run database initialization later with:"
+            echo "  source venv/bin/activate && python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
+        }
+    else
+        print_warning "Virtual environment not found - using system Python"
+        python3 -c "
+import asyncio
+from src.services.session_service import SessionService
+
+async def init_db():
+    service = SessionService()
+    await service.create_tables()
+    print('Database tables created successfully')
+
+asyncio.run(init_db())
+" 2>/dev/null || {
+            print_warning "Database initialization failed - make sure dependencies are installed"
+            print_status "You can run database initialization later with:"
+            echo "  python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
+        }
+    fi
 fi
 
 # Function to setup Twilio CLI and create services
@@ -504,6 +522,19 @@ except Exception as e:
     
     return 0
 }
+
+# Optional Twilio CLI setup
+echo ""
+print_status "Basic setup completed!"
+echo ""
+read -p "Do you want to set up Twilio CLI and create services automatically? (y/N): " SETUP_TWILIO_CLI
+
+if [ "$SETUP_TWILIO_CLI" = "y" ] || [ "$SETUP_TWILIO_CLI" = "Y" ]; then
+    setup_twilio_cli
+else
+    print_status "Skipping Twilio CLI setup - you can run it later if needed"
+    print_status "To run Twilio CLI setup later, you can call the setup_twilio_cli function"
+fi
 
 # Final steps
 echo ""

@@ -62,8 +62,8 @@ async def handle_message_added(
         
         logger.info("Processing message-added webhook", extra=processing_context)
         
-        # Validate webhook signature for security
-        if settings.twilio.auth_token and x_twilio_signature:
+        # Validate webhook signature for security (if enabled)
+        if settings.security.validate_webhook_signatures and settings.twilio.auth_token and x_twilio_signature:
             # Use the original URL from X-Forwarded-Proto and Host headers if available (for ngrok)
             forwarded_proto = request.headers.get('X-Forwarded-Proto', 'https')
             forwarded_host = request.headers.get('X-Forwarded-Host') or request.headers.get('Host')
@@ -83,10 +83,28 @@ async def handle_message_added(
                 body_str, x_twilio_signature, url
             )
             if not is_valid_signature:
-                logger.warning(f"Invalid webhook signature for URL: {url}", extra=processing_context)
+                # Provide detailed debugging information for development
+                if settings.debug:
+                    logger.warning(
+                        f"Webhook signature validation failed. Debug info:\n"
+                        f"  - URL used for validation: {url}\n"
+                        f"  - Request headers: Host={request.headers.get('Host')}, "
+                        f"X-Forwarded-Host={request.headers.get('X-Forwarded-Host')}, "
+                        f"X-Forwarded-Proto={request.headers.get('X-Forwarded-Proto')}\n"
+                        f"  - Body length: {len(body_str)}\n"
+                        f"  - Expected signature starts with: {x_twilio_signature[:10]}...\n"
+                        f"  - To disable signature validation for development, set VALIDATE_WEBHOOK_SIGNATURES=false",
+                        extra=processing_context
+                    )
+                else:
+                    logger.warning(f"Invalid webhook signature for URL: {url}", extra=processing_context)
                 raise HTTPException(status_code=403, detail="Invalid webhook signature")
             else:
                 logger.debug("Webhook signature validated successfully")
+        elif not settings.security.validate_webhook_signatures:
+            logger.warning("Webhook signature validation is DISABLED - not recommended for production", extra=processing_context)
+        elif not x_twilio_signature:
+            logger.warning("No X-Twilio-Signature header found in webhook request", extra=processing_context)
         
         # Parse webhook data
         try:

@@ -132,6 +132,15 @@ def setup_routes(app: FastAPI) -> None:
         prefix="/webhook",
         tags=["webhooks"]
     )
+    
+    # Voice routes
+    from src.handlers import voice_handler
+    
+    app.include_router(
+        voice_handler.router,
+        prefix="/voice",
+        tags=["voice"]
+    )
 
 
 def setup_error_handlers(app: FastAPI) -> None:

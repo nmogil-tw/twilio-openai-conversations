@@ -211,3 +211,37 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+/dev-docs
+
+# macOS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker override files
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Additional environment files
+.env.local
+.env.dev
+.env.test
+.env.prod
+.env.production
+.env.staging
+
+# SQLite databases (additional patterns)
+*.sqlite
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Temporary files
+*.tmp
+*.temp
+.temporary/
+temp/

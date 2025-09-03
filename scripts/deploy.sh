@@ -163,7 +163,7 @@ pre_deployment_checks() {
     fi
     
     # Check required files
-    REQUIRED_FILES=("requirements.txt" "Dockerfile" "src/main.py")
+    REQUIRED_FILES=("pyproject.toml" "Dockerfile" "src/main.py")
     for file in "${REQUIRED_FILES[@]}"; do
         if [ ! -f "$file" ]; then
             print_error "Required file not found: $file"
@@ -182,21 +182,16 @@ run_tests() {
     
     print_status "Running tests..."
     
-    if [ ! -f "requirements.txt" ] || ! grep -q pytest requirements.txt; then
-        print_warning "pytest not found in requirements.txt, skipping tests"
+    if [ ! -f "pyproject.toml" ] || ! grep -q pytest pyproject.toml; then
+        print_warning "pytest not found in pyproject.toml, skipping tests"
         return 0
     fi
     
-    # Set up test environment
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-    fi
-    
-    # Run tests
+    # Run tests with UV
     if $DRY_RUN; then
-        print_status "[DRY RUN] Would run: pytest tests/"
+        print_status "[DRY RUN] Would run: uv run pytest tests/"
     else
-        pytest tests/ --tb=short -v || {
+        uv run pytest tests/ --tb=short -v || {
             print_error "Tests failed"
             exit 1
         }
@@ -351,7 +346,7 @@ deploy_heroku() {
         git push heroku main
         
         # Run database migrations if needed
-        heroku run python -c "from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())" --app "$HEROKU_APP"
+        heroku run uv run python -c "from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())" --app "$HEROKU_APP"
         
         # Open app
         APP_URL=$(heroku info --app "$HEROKU_APP" -j | python3 -c "import sys, json; print(json.load(sys.stdin)['app']['web_url'])")

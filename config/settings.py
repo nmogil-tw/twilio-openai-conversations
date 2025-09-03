@@ -51,6 +51,24 @@ class ApplicationSettings(BaseSettings):
     conversation_timeout_minutes: int = Field(default=30, env="CONVERSATION_TIMEOUT_MINUTES")
     typing_indicator_timeout_seconds: int = Field(default=10, env="TYPING_INDICATOR_TIMEOUT_SECONDS")
     agent_config_file_path: str = Field(default="config/agent_config.yml", env="AGENT_CONFIG_PATH")
+    
+    # Voice Configuration
+    voice_welcome_greeting: str = Field(
+        default="Hi! I am your voice assistant powered by Twilio and OpenAI. Ask me anything!",
+        env="VOICE_WELCOME_GREETING"
+    )
+    voice_system_prompt: str = Field(
+        default="You are a helpful customer service assistant. This conversation is being translated to voice, so answer carefully. When you respond, please spell out all numbers, for example 'twenty' not '20'. Do not include emojis, bullet points, asterisks, or special symbols in your responses. Keep responses conversational and concise.",
+        env="VOICE_SYSTEM_PROMPT"
+    )
+    ngrok_domain: Optional[str] = Field(None, env="NGROK_DOMAIN", description="Domain for WebSocket URL (without https://)")
+    voice_max_session_duration: int = Field(default=1800, env="VOICE_MAX_SESSION_DURATION", description="Maximum voice session duration in seconds")
+    voice_silence_timeout: int = Field(default=30, env="VOICE_SILENCE_TIMEOUT", description="Silence timeout in seconds")
+    
+    # Streaming Configuration
+    enable_streaming: bool = Field(default=True, env="ENABLE_STREAMING")
+    streaming_chunk_size: int = Field(default=50, env="STREAMING_CHUNK_SIZE", description="Number of characters per streaming chunk")
+    streaming_delay_ms: int = Field(default=100, env="STREAMING_DELAY_MS", description="Delay between streaming chunks in milliseconds")
 
     @field_validator("log_level")
     @classmethod

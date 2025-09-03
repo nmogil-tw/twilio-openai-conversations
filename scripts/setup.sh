@@ -58,8 +58,8 @@ if ! check_command "python3"; then
     MISSING_DEPS+=("python3")
 fi
 
-if ! check_command "pip3"; then
-    MISSING_DEPS+=("pip3")
+if ! check_command "uv"; then
+    MISSING_DEPS+=("uv")
 fi
 
 if ! check_command "git"; then
@@ -94,8 +94,8 @@ check_command "ngrok" || print_warning "ngrok not found - local webhook testing 
 print_status "Setting up Twilio + OpenAI Conversations..."
 echo ""
 echo "This will:"
-echo "✓ Create Python virtual environment"  
-echo "✓ Install dependencies"
+echo "✓ Set up UV environment"  
+echo "✓ Install dependencies with UV"
 echo "✓ Set up configuration files"
 echo "✓ Initialize database"
 echo ""
@@ -107,63 +107,38 @@ if [ "$CONTINUE" = "n" ] || [ "$CONTINUE" = "N" ]; then
 fi
 
 # Set all flags to true for simple setup
-SETUP_VENV=true
+SETUP_UV=true
 SETUP_DEPS=true
 SETUP_CONFIG=true
 SETUP_DB=true
 
-# Virtual environment setup
-if [ "$SETUP_VENV" = true ]; then
-    print_status "Setting up Python virtual environment..."
+# UV environment setup
+if [ "$SETUP_UV" = true ]; then
+    print_status "Setting up UV environment..."
     
-    if [ -d "venv" ]; then
-        print_warning "Virtual environment already exists"
-        read -p "Do you want to recreate it? (y/N): " RECREATE_VENV
-        if [ "$RECREATE_VENV" = "y" ] || [ "$RECREATE_VENV" = "Y" ]; then
-            rm -rf venv
-            print_status "Removed existing virtual environment"
-        else
-            print_status "Using existing virtual environment"
-        fi
-    fi
-    
-    if [ ! -d "venv" ]; then
-        python3 -m venv venv
-        print_success "Created virtual environment"
-    fi
-    
-    # Activate virtual environment
-    source venv/bin/activate
-    print_success "Activated virtual environment"
-    
-    # Upgrade pip
-    pip install --upgrade pip
-    print_success "Upgraded pip"
-fi
-
-# Dependencies installation
-if [ "$SETUP_DEPS" = true ]; then
-    print_status "Installing Python dependencies..."
-    
-    if [ ! -f "requirements.txt" ]; then
-        print_error "requirements.txt not found"
+    # Check if pyproject.toml exists
+    if [ ! -f "pyproject.toml" ]; then
+        print_error "pyproject.toml not found"
+        print_status "Run 'uv init' to initialize a UV project"
         exit 1
     fi
     
-    # If virtual environment wasn't set up in this run, try to activate existing one
-    if [ "$SETUP_VENV" = false ] && [ -d "venv" ]; then
-        source venv/bin/activate
-        print_status "Activated existing virtual environment"
+    # Install dependencies with UV
+    uv sync --dev
+    print_success "Set up UV environment and installed dependencies"
+fi
+
+# Dependencies are already installed by UV sync above
+if [ "$SETUP_DEPS" = true ] && [ "$SETUP_UV" = false ]; then
+    print_status "Installing Python dependencies with UV..."
+    
+    if [ ! -f "pyproject.toml" ]; then
+        print_error "pyproject.toml not found"
+        exit 1
     fi
     
-    pip install -r requirements.txt
-    print_success "Installed Python dependencies"
-    
-    # Install development dependencies if they exist
-    if [ -f "requirements-dev.txt" ]; then
-        pip install -r requirements-dev.txt
-        print_success "Installed development dependencies"
-    fi
+    uv sync --dev
+    print_success "Installed Python dependencies with UV"
 fi
 
 # Configuration setup
@@ -211,10 +186,9 @@ if [ "$SETUP_DB" = true ]; then
     # Create data directory
     mkdir -p data
     
-    # Initialize database tables - ensure virtual environment is active
-    if [ -d "venv" ]; then
-        print_status "Using virtual environment for database initialization..."
-        venv/bin/python3 -c "
+    # Initialize database tables using UV
+    print_status "Using UV to initialize database..."
+    uv run python3 -c "
 import asyncio
 from src.services.session_service import SessionService
 
@@ -225,28 +199,10 @@ async def init_db():
 
 asyncio.run(init_db())
 " 2>/dev/null || {
-            print_warning "Database initialization failed - make sure dependencies are installed"
-            print_status "You can run database initialization later with:"
-            echo "  source venv/bin/activate && python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
-        }
-    else
-        print_warning "Virtual environment not found - using system Python"
-        python3 -c "
-import asyncio
-from src.services.session_service import SessionService
-
-async def init_db():
-    service = SessionService()
-    await service.create_tables()
-    print('Database tables created successfully')
-
-asyncio.run(init_db())
-" 2>/dev/null || {
-            print_warning "Database initialization failed - make sure dependencies are installed"
-            print_status "You can run database initialization later with:"
-            echo "  python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
-        }
-    fi
+        print_warning "Database initialization failed - make sure dependencies are installed"
+        print_status "You can run database initialization later with:"
+        echo "  uv run python3 -c \"from src.services.session_service import SessionService; import asyncio; asyncio.run(SessionService().create_tables())\""
+    }
 fi
 
 # Function to setup Twilio CLI and create services
@@ -490,13 +446,8 @@ configure_credentials() {
 test_installation() {
     print_status "Testing installation..."
     
-    # Activate virtual environment if it exists
-    if [ -d "venv" ]; then
-        source venv/bin/activate
-    fi
-    
-    # Test imports
-    python3 -c "
+    # Test imports using UV
+    uv run python3 -c "
 try:
     from config.settings import settings
     print('✓ Settings loaded successfully')
@@ -547,10 +498,11 @@ if test_installation; then
     print_success "🎉 You're ready to go! Next steps:"
     echo ""
     echo "1. Add your credentials to .env file"
-    echo "2. Start the application: docker-compose up"
-    echo "3. Expose with ngrok: ngrok http 8000"
-    echo "4. Configure Twilio webhooks (we can help with this!)"
-    echo "5. Test by sending an SMS to your Twilio number"
+    echo "2. Start the application: uv run uvicorn src.main:app --reload"
+    echo "3. Or use Docker: docker-compose up"
+    echo "4. Expose with ngrok: ngrok http 8000"
+    echo "5. Configure Twilio webhooks (we can help with this!)"
+    echo "6. Test by sending an SMS to your Twilio number"
     echo ""
     echo "Visit http://localhost:8000/health to verify everything works!"
     echo "Need help? Check docs/setup.md for detailed guides."

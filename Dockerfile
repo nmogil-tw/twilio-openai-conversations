@@ -2,26 +2,26 @@ FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PYTHONUNBUFFERED=1
 
 # Create and set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies and UV
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Add UV to PATH
+ENV PATH="/root/.local/bin:$PATH"
 
-# Install Python dependencies
-# First, uninstall any conflicting 'agents' package that might be installed
-RUN pip uninstall -y agents || true
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy pyproject.toml and uv.lock for better caching
+COPY pyproject.toml uv.lock* ./
+
+# Install Python dependencies with UV
+RUN uv sync --frozen --no-dev
 
 # Copy application code
 COPY . .
@@ -39,5 +39,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application with UV
+CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

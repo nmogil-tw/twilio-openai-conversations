@@ -306,6 +306,59 @@ class CustomerServiceAgentManager:
                 processing_time_ms=int((datetime.now() - start_time).total_seconds() * 1000),
                 metadata={"error": str(e), "fallback_used": True}
             )
+    
+    async def process_voice_message(
+        self,
+        message: str,
+        session_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> AgentResponse:
+        """
+        Process voice message with voice-optimized formatting.
+        """
+        # Use voice-specific system prompt and formatting
+        voice_context = context or {}
+        voice_context["voice_mode"] = True
+        
+        # Process with existing logic but optimize for voice
+        response = await self.process_message(message, session_id, voice_context)
+        
+        # Post-process response for voice (remove special characters, etc.)
+        response.content = self._format_for_voice(response.content)
+        
+        return response
+
+    def _format_for_voice(self, text: str) -> str:
+        """Format text for voice output."""
+        import re
+        
+        # Remove emojis and special characters
+        text = re.sub(r'[^\w\s\.\,\!\?\-]', '', text)
+        
+        # Convert numbers to words (basic implementation)
+        # You might want to use a library like 'num2words' for this
+        text = re.sub(r'\b\d+\b', lambda m: self._number_to_words(int(m.group())), text)
+        
+        return text.strip()
+
+    def _number_to_words(self, num: int) -> str:
+        """Convert simple numbers to words (basic implementation)."""
+        numbers = {
+            0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four',
+            5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine',
+            10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen',
+            14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen',
+            18: 'eighteen', 19: 'nineteen', 20: 'twenty'
+        }
+        
+        if num in numbers:
+            return numbers[num]
+        elif num < 100:
+            tens = num // 10 * 10
+            ones = num % 10
+            return f"{numbers.get(tens, str(tens))}{' ' + numbers.get(ones, str(ones)) if ones else ''}"
+        else:
+            return str(num)  # Fallback for larger numbers
 
 
 # Backward compatibility - this matches the original class name expected by webhook handler

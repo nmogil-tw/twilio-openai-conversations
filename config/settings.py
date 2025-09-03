@@ -65,6 +65,9 @@ class ApplicationSettings(BaseSettings):
     voice_max_session_duration: int = Field(default=1800, env="VOICE_MAX_SESSION_DURATION", description="Maximum voice session duration in seconds")
     voice_silence_timeout: int = Field(default=30, env="VOICE_SILENCE_TIMEOUT", description="Silence timeout in seconds")
     
+    # Voice Interstitials Configuration
+    voice_interstitials_enabled: bool = Field(default=True, env="VOICE_INTERSTITIALS_ENABLED")
+    
     # Streaming Configuration
     enable_streaming: bool = Field(default=True, env="ENABLE_STREAMING")
     streaming_chunk_size: int = Field(default=50, env="STREAMING_CHUNK_SIZE", description="Number of characters per streaming chunk")

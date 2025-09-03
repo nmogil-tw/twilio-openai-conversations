@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Import application components
-from config.settings import ApplicationSettings, TwilioSettings, OpenAISettings
+from config.settings import ApplicationSettings
 from src.main import app
 from src.models.conversation import ConversationSession, ConversationContext, Message, MessageRole
 from src.models.webhook import WebhookRequest
@@ -42,16 +42,12 @@ def test_settings() -> ApplicationSettings:
     return ApplicationSettings(
         debug=True,
         log_level="DEBUG",
-        twilio=TwilioSettings(
-            account_sid="ACtest123456789012345678901234",
-            auth_token="test_auth_token",
-            conversations_service_sid="IStest123456789012345678901234",
-            webhook_secret="test_webhook_secret"
-        ),
-        openai=OpenAISettings(
-            api_key="sk-test123456789012345678901234567890",
-            model="gpt-4o-mini"
-        )
+        twilio_account_sid="ACtest123456789012345678901234",
+        twilio_auth_token="test_auth_token",
+        twilio_conversations_service_sid="IStest123456789012345678901234",
+        webhook_secret="test_webhook_secret",
+        openai_api_key="sk-test123456789012345678901234567890",
+        openai_model="gpt-4o-mini"
     )
 
 

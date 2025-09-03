@@ -6,7 +6,7 @@ Manages voice sessions, streaming responses, and integration with existing servi
 import asyncio
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Optional, AsyncGenerator
+from typing import Dict, Optional, AsyncGenerator, Set
 from fastapi import WebSocket
 
 from config.settings import settings
@@ -27,6 +27,51 @@ class VoiceService:
         self.active_websockets: Dict[str, WebSocket] = {}
         self.agent_service = CustomerServiceAgent()
         self.session_service = SessionService()
+        
+        # Simple interstitial mappings for existing tools
+        self.interstitials = {
+            "order": "Let me check on that order for you.",
+            "product": "Let me pull up that product information.", 
+            "store": "Let me check our store information.",
+            "weather": "Let me check the weather for you.",
+            "help": "Let me help you with that.",
+            "default": "One moment please."
+        }
+        
+        # Track recent interstitials to avoid repetition
+        self.recent_interstitials: Set[str] = set()
+    
+    def _get_interstitial(self, message: str, session_id: str) -> Optional[str]:
+        """Get appropriate interstitial for user message."""
+        if not settings.voice_interstitials_enabled:
+            return None
+            
+        message_lower = message.lower()
+        
+        # Simple keyword detection for existing tools
+        if any(word in message_lower for word in ["order", "track", "shipping", "delivery"]):
+            interstitial_key = f"{session_id}:order"
+            if interstitial_key not in self.recent_interstitials:
+                self.recent_interstitials.add(interstitial_key)
+                return self.interstitials["order"]
+        
+        elif any(word in message_lower for word in ["product", "item", "catalog", "iphone", "case", "laptop", "phone"]):
+            interstitial_key = f"{session_id}:product"
+            if interstitial_key not in self.recent_interstitials:
+                self.recent_interstitials.add(interstitial_key)
+                return self.interstitials["product"]
+                
+        elif any(word in message_lower for word in ["store", "hours", "location", "address", "where"]):
+            interstitial_key = f"{session_id}:store"
+            if interstitial_key not in self.recent_interstitials:
+                self.recent_interstitials.add(interstitial_key)
+                return self.interstitials["store"]
+        
+        # Clean up old entries periodically
+        if len(self.recent_interstitials) > 50:
+            self.recent_interstitials.clear()
+            
+        return None
     
     async def create_voice_session(
         self, 
@@ -197,19 +242,28 @@ class VoiceService:
         messages: list,
         session_id: Optional[str] = None
     ) -> AsyncGenerator[StreamingChunk, None]:
-        """Get streaming response from the agent service."""
-        # This will be implemented based on your agent service streaming capabilities
-        # For now, simulate streaming by chunking a complete response
+        """Get streaming response with optional interstitials for voice calls."""
         
         try:
-            # Get complete response from agent (modify agent_service to support streaming)
+            # Extract the user message
+            user_message = messages[-1]["content"] if messages else ""
+            
+            # Check for interstitial opportunity (voice calls only)
+            interstitial = self._get_interstitial(user_message, session_id or "default")
+            
+            if interstitial:
+                logger.info(f"Playing voice interstitial: {interstitial}")
+                yield StreamingChunk(content=interstitial, is_final=False)
+                await asyncio.sleep(0.1)  # Brief pause
+            
+            # Get response from agent (unchanged)
             response = await self.agent_service.process_message(
-                message=messages[-1]["content"],
+                message=user_message,
                 session_id=session_id,
                 context={"voice_mode": True}
             )
             
-            # Simulate streaming by chunking the response
+            # Stream the response (existing logic)
             content = response.content
             chunk_size = settings.streaming_chunk_size
             

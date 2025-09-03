@@ -1,30 +1,86 @@
 version: '3.8'
 
 services:
-  # Main application - just add your .env file and run!
+  # Main application - optimized for development
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      # Enable BuildKit for faster builds and better caching
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     ports:
       - "8000:8000"
     environment:
       - DEBUG=true
       - DATABASE_URL=sqlite:///./data/conversations.db
+      - PYTHONPATH=/app
     env_file:
       - .env
     volumes:
-      - ./data:/app/data  # Database persistence
+      - ./data:/app/data:rw  # Database persistence with explicit read-write
+      - /app/.venv  # Exclude .venv from host mount for performance
     restart: unless-stopped
+    # Development resource limits (generous for local development)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5'
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Network mode for better performance in development
+    network_mode: bridge
 
-  # Optional services (uncomment if needed for production)
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379" 
-  #   volumes:
-  #     - redis_data:/data
-  #   restart: unless-stopped
+  # Optional Redis for development testing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    # Redis resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+        reservations:
+          memory: 32M
+          cpus: '0.1'
+    # Redis configuration for development
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    # Health check for Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   redis_data:
+    driver: local

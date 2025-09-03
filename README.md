@@ -8,8 +8,10 @@ Build AI-powered customer chatbots that work across SMS, WhatsApp, and messaging
 ## What You Get
 
 - **Intelligent AI Assistant** - Handles customer inquiries naturally with OpenAI
-- **Multi-Channel Support** - Works on SMS, WhatsApp, Web Chat
+- **Multi-Channel Support** - Works on SMS, WhatsApp, Web Chat, and **Voice Calls**
+- **Natural Voice Conversations** - Voice interstitials for smooth, human-like phone interactions
 - **Built-in Tools** - Order lookup, product search, store hours, FAQ responses
+- **Real-time Voice Streaming** - WebSocket-based voice communication with TwiML generation
 - **Security Considerations** - Includes production security checklist and monitoring guidance
 - **5-minute Setup** - Get started quickly with automated scripts
 
@@ -29,6 +31,11 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_CONVERSATIONS_SERVICE_SID=ISxxxxxxxxxxxxx
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxx
+
+# Voice Configuration (for voice call support)
+NGROK_DOMAIN=your-ngrok-domain.ngrok.app
+VOICE_WELCOME_GREETING="Hi! I am your voice assistant. Ask me anything!"
+VOICE_INTERSTITIALS_ENABLED=true
 ```
 
 ### Step 3: Run
@@ -57,6 +64,23 @@ twilio api:conversations:v1:services:configuration:webhooks:update \
 
 **Done!** Text your Twilio number to chat with your AI assistant.
 
+### Step 5: Configure Voice Calls (Optional)
+
+For voice call support, configure your Twilio phone number:
+
+```bash
+# Set your phone number webhook to use TwiML endpoint
+twilio phone-numbers:update +1234567890 \
+    --voice-url https://abc123.ngrok.app/voice/twiml \
+    --voice-method POST
+```
+
+**Test Voice:** Call your Twilio number and try:
+- "What's my order status?"
+- "Do you have iPhone cases?"
+
+You'll hear natural interstitials like "Let me check on that order for you" before the AI response.
+
 ## Example Conversations
 
 **Order Status:**
@@ -71,6 +95,13 @@ Customer: "Do you have iPhone 15 cases?"
 AI: "Yes! We have iPhone 15 cases in several styles. Most popular is the Clear MagSafe case for $29.99."
 ```
 
+**Voice Call with Interstitials:**
+```
+Customer: "What's my order status?"
+AI: "Let me check on that order for you." (plays immediately)
+AI: "Your order shipped yesterday! Tracking: 1Z123456789. Expected delivery: Thursday."
+```
+
 ## How It Works
 
 ```
@@ -82,6 +113,15 @@ AI: "Yes! We have iPhone 15 cases in several styles. Most popular is the Clear M
 │ • Web Chat      │     │ • Multi-Channel         │     │   Validation     │
 │                 │     │ • Participant Mgmt      │     │ • Rate Limiting  │
 └─────────────────┘     └─────────────────────────┘     └──────────────────┘
+        │                                                         │
+        │               ┌─────────────────────────┐               │
+        └──────────────►│  Twilio Voice Calls     │──────────────►│
+                        │                         │               │
+                        │ • TwiML Generation      │               │
+                        │ • ConversationRelay     │               │
+                        │ • WebSocket Connection  │               │
+                        │ • Voice Interstitials   │               │
+                        └─────────────────────────┘               │
                                                                     │
                                                                     ▼
                         ┌────────────────────────────────────────────────────────┐
@@ -126,7 +166,7 @@ AI: "Yes! We have iPhone 15 cases in several styles. Most popular is the Clear M
                         └────────────────────────────────────────────────────────┘
 ```
 
-Advanced flow: Messages are processed by a **multi-agent system** using the OpenAI Agents SDK, with intelligent routing between specialized agents and persistent conversation memory.
+Advanced flow: Messages are processed by a **multi-agent system** using the OpenAI Agents SDK, with intelligent routing between specialized agents and persistent conversation memory. **Voice calls** include natural interstitials ("Let me check that for you") for smooth conversation flow.
 
 ## OpenAI Agents SDK Integration
 
@@ -165,6 +205,12 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_CONVERSATIONS_SERVICE_SID=ISxxxxxxxxxxxxx
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxx
+
+# Voice Configuration
+NGROK_DOMAIN=your-ngrok-domain.ngrok.app
+VOICE_WELCOME_GREETING="Hi! I am your voice assistant. Ask me anything!"
+VOICE_INTERSTITIALS_ENABLED=true
+VOICE_SYSTEM_PROMPT="You are a helpful customer service assistant..."
 ```
 
 ## Testing & Development
@@ -177,8 +223,29 @@ pytest
 **View API Docs:**
 Visit http://localhost:8000/docs when running locally.
 
+**Voice API Endpoints:**
+- `POST /voice/twiml` - Generate TwiML for incoming voice calls
+- `WebSocket /voice/ws` - Real-time voice communication endpoint  
+- `GET /voice/test` - Voice service health check
+
 **Health Check:**
 Visit http://localhost:8000/health to verify everything works.
+
+**Voice Testing:**
+```bash
+# Test voice endpoint health
+curl http://localhost:8000/voice/test
+
+# Configure your Twilio phone number webhook to use:
+# http://your-ngrok-domain.ngrok.app/voice/twiml
+```
+
+**Test Voice Calls:**
+1. Call your Twilio phone number
+2. Try these voice commands:
+   - "What's my order status?" → Should hear: "Let me check on that order for you"
+   - "Do you have iPhone cases?" → Should hear: "Let me pull up that product information"
+   - "What are your store hours?" → Should hear: "Let me check our store information"
 
 ## Production Security Checklist
 
@@ -216,6 +283,11 @@ REDIS_URL=redis://user:pass@host:6379
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx  
 TWILIO_AUTH_TOKEN=your_auth_token
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxx
+
+# Voice Configuration (production)
+NGROK_DOMAIN=your-production-domain.com
+VOICE_WELCOME_GREETING="Hi! Welcome to our customer service. How can I help you today?"
+VOICE_INTERSTITIALS_ENABLED=true
 ```
 
 ### Security Architecture:
@@ -380,6 +452,39 @@ LOG_LEVEL=DEBUG         # Maximum logging detail
 - **Issues**: [GitHub Issues](https://github.com/twilio/twilio-openai-conversations/issues)
 - **Twilio Docs**: [Conversations API](https://www.twilio.com/docs/conversations)
 - **OpenAI Docs**: [OpenAI Platform](https://platform.openai.com/docs)
+
+## Production Deployment
+
+### Docker Compose Production Setup
+
+Use the production configuration with Redis and PostgreSQL:
+
+```bash
+# Production deployment with external database
+docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+
+# This includes:
+# - PostgreSQL database (instead of SQLite)
+# - Redis for session management
+# - Production security settings
+```
+
+**Production docker-compose.production.yml features:**
+- PostgreSQL database with persistent storage
+- Redis for session caching and WebSocket state
+- Production networking configuration
+- Health checks and restart policies
+
+### Environment Setup for Production
+
+Create `.env.production`:
+```env
+DEBUG=false
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/conversations
+REDIS_URL=redis://redis:6379
+NGROK_DOMAIN=your-production-domain.com
+VOICE_INTERSTITIALS_ENABLED=true
+```
 
 ## Deploy with Temporal
 
